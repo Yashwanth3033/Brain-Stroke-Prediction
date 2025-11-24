@@ -1,0 +1,8 @@
+Metric,Value
+Accuracy,0.9620111731843576
+Precision (Weighted),0.9626209976972665
+Recall (Weighted),0.9620111731843576
+F1-Score (Weighted),0.9619344134583717
+Precision (Macro),0.9620879299679478
+Recall (Macro),0.9625426595263136
+F1-Score (Macro),0.9619404791989492

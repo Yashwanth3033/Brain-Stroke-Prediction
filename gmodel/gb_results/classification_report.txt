@@ -1,0 +1,15 @@
+Tested on 2685 samples and 18 features.
+
+Gradient Boosting Test Accuracy: 98.25%
+
+===== Gradient Boosting Classification Report =====
+              precision    recall  f1-score   support
+
+           0       1.00      0.93      0.96       644
+           1       0.94      1.00      0.97       698
+           2       1.00      1.00      1.00       698
+           3       1.00      1.00      1.00       645
+
+    accuracy                           0.98      2685
+   macro avg       0.98      0.98      0.98      2685
+weighted avg       0.98      0.98      0.98      2685

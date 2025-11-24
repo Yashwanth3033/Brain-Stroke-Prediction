@@ -1,0 +1,108 @@
+
+======================================================================
+CNN MODEL EVALUATION REPORT
+======================================================================
+
+📅 Evaluation Date: 2025-10-23 02:53:40
+📊 Model Type: Keras/TensorFlow Sequential (CNN/Dense)
+🎯 Task: Multi-class Classification
+
+======================================================================
+DATASET INFORMATION
+======================================================================
+
+Training Samples: 10800
+Test Samples: 2685
+Number of Features: 18
+Number of Classes: 4
+
+Class Distribution (Test Set):
+result
+0    644
+1    698
+2    698
+3    645
+
+======================================================================
+PERFORMANCE METRICS (ON TEST DATA)
+======================================================================
+
+OVERALL ACCURACY: 0.9620 (96.20%)
+
+WEIGHTED METRICS (Accounts for Class Imbalance):
+  - Precision: 0.9626
+  - Recall:    0.9620
+  - F1-Score:  0.9619
+
+MACRO METRICS (Equal Weight Per Class):
+  - Precision: 0.9621
+  - Recall:    0.9625
+  - F1-Score:  0.9619
+
+======================================================================
+PER-CLASS PERFORMANCE (ON TEST DATA)
+======================================================================
+
+              precision    recall  f1-score   support
+
+     Class 0     0.9483    0.9689    0.9585       644
+     Class 1     0.9632    0.9742    0.9687       698
+     Class 2     0.9877    0.9241    0.9548       698
+     Class 3     0.9491    0.9829    0.9657       645
+
+    accuracy                         0.9620      2685
+   macro avg     0.9621    0.9625    0.9619      2685
+weighted avg     0.9626    0.9620    0.9619      2685
+
+
+======================================================================
+CONFUSION MATRIX (ON TEST DATA)
+======================================================================
+
+[[624  12   1   7]
+ [  6 680   7   5]
+ [ 21  10 645  22]
+ [  7   4   0 634]]
+
+======================================================================
+TOP 10 MOST IMPORTANT FEATURES (FROM SHAP ON TEST DATA)
+======================================================================
+
+(Based on Mean Absolute SHAP Value, averaged across all classes)
+
+Empty DataFrame
+Columns: [Feature, SHAP_Importance]
+Index: []
+
+======================================================================
+INTERPRETABILITY METHODS (ON TEST DATA)
+======================================================================
+
+✅ LIME (Local Interpretable Model-agnostic Explanations)
+   - Generated explanations for 5 test instances
+   - Files: cnn_lime_explanation_*.html
+
+✅ SHAP (SHapley Additive exPlanations) using DeepExplainer
+   - Computed SHAP values for 100 test instances
+   - Generated summary and waterfall plots
+   - Files: cnn_shap_*.png
+
+======================================================================
+SAVED ARTIFACTS
+======================================================================
+
+📁 cnn_evaluation_results/
+   ├── cnn_performance_metrics.csv
+   ├── cnn_classification_report.csv
+   ├── cnn_confusion_matrix.png
+   ├── cnn_confusion_matrix_normalized.png
+   ├── cnn_roc_curve.png
+   ├── cnn_lime_explanation_*.html (5 files)
+   ├── cnn_shap_summary.png
+   ├── cnn_shap_waterfall_*.png (3 files)
+   ├── cnn_shap_feature_importance.csv
+   └── cnn_evaluation_report.txt (this file)
+
+======================================================================
+END OF REPORT
+======================================================================
