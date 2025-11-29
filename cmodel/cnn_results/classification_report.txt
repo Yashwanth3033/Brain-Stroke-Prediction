@@ -1,15 +1,15 @@
 Tested on 2685 samples and 18 features.
 
-CNN Test Accuracy (with Feature Dropout): 95.38%
+CNN Test Accuracy: 91.73%
 
 ===== CNN Classification Report =====
               precision    recall  f1-score   support
 
-           0       0.94      0.96      0.95       644
-           1       0.96      0.96      0.96       698
-           2       0.95      0.95      0.95       698
-           3       0.96      0.94      0.95       645
+           0       0.93      1.00      0.96       644
+           1       1.00      0.84      0.91       698
+           2       0.80      1.00      0.89       698
+           3       1.00      0.83      0.91       645
 
-    accuracy                           0.95      2685
-   macro avg       0.95      0.95      0.95      2685
-weighted avg       0.95      0.95      0.95      2685
+    accuracy                           0.92      2685
+   macro avg       0.93      0.92      0.92      2685
+weighted avg       0.93      0.92      0.92      2685

@@ -37089,34 +37089,34 @@
 /***/ })
 /******/ ]);
 //# sourceMappingURL=bundle.js.map </script></head><body>
-        <div class="lime top_div" id="top_divN1Y1OVFBFWZKA1V"></div>
+        <div class="lime top_div" id="top_divRHADPT9FJ6NEQSO"></div>
         
         <script>
-        var top_div = d3.select('#top_divN1Y1OVFBFWZKA1V').classed('lime top_div', true);
+        var top_div = d3.select('#top_divRHADPT9FJ6NEQSO').classed('lime top_div', true);
         
             var pp_div = top_div.append('div')
                                 .classed('lime predict_proba', true);
             var pp_svg = pp_div.append('svg').style('width', '100%');
-            var pp = new lime.PredictProba(pp_svg, ["Class 0", "Class 1", "Class 2", "Class 3"], [5.039713641963317e-07, 9.02887768461369e-06, 6.114103143772809e-07, 0.9999898672103882]);
+            var pp = new lime.PredictProba(pp_svg, ["Class 0", "Class 1", "Class 2", "Class 3"], [0.23312684893608093, 0.2522824704647064, 0.2557128667831421, 0.25887781381607056]);
             
         
         var exp_div;
             var exp = new lime.Explanation(["Class 0", "Class 1", "Class 2", "Class 3"]);
         
                 exp_div = top_div.append('div').classed('lime explanation', true);
-                exp.show([["heart_disease <= -0.25", -0.37815625814979936], ["-1.00 < diabetes <= 1.00", -0.13628957752977192], ["redbloodcellcount > 0.12", -0.10588445873793478], ["-0.23 < cholesterol <= 0.54", -0.0790225642504059], ["-1.52 < gender <= 0.66", -0.07079253462557471], ["hypertension <= -0.37", 0.06473964166693172], ["-0.86 < age <= 0.00", -0.05201563532031825], ["smoking_status <= -1.29", 0.044698764522828165], ["family_history <= -0.50", 0.03653831376709234], ["alcohol <= -0.95", 0.026941615188323158]], 3, exp_div);
+                exp.show([["heart_disease <= -0.25", -0.017294891619936647], ["whitebloodcellcount > 0.15", 0.0044650758709775225], ["hypertension <= -0.37", -0.004113841098190606], ["-1.00 < diabetes <= 1.00", -0.0037569470427995444], ["family_history <= -0.50", 0.002697368621937468], ["-0.96 < residence_type <= 1.04", -0.0015126036620433496], ["-1.52 < gender <= 0.66", -0.001472142432429184], ["-0.32 < bpsystolic <= -0.07", -0.001435517994335984], ["-0.58 < bmi <= -0.22", 0.001298957474802539], ["-0.86 < age <= 0.00", -0.0012153185427599125]], 3, exp_div);
                 
                 exp_div = top_div.append('div').classed('lime explanation', true);
-                exp.show([["heart_disease <= -0.25", 0.3012789769937011], ["hypertension <= -0.37", -0.24578879948293283], ["work_type <= -0.46", 0.19787808219539477], ["-1.00 < diabetes <= 1.00", 0.1887522517524054], ["ever_married <= -1.53", 0.10176854678111585], ["-0.96 < residence_type <= 1.04", -0.10100920495893945], ["-1.52 < gender <= 0.66", 0.0802606137450194], ["redbloodcellcount > 0.12", -0.06830876908903775], ["family_history <= -0.50", -0.06823407605960038], ["smoking_status <= -1.29", -0.045366594457535755]], 1, exp_div);
+                exp.show([["work_type <= -0.46", 0.017376289613394203], ["heart_disease <= -0.25", 0.005654319449162656], ["family_history <= -0.50", -0.005638078710040573], ["whitebloodcellcount > 0.15", 0.005330042175447335], ["hypertension <= -0.37", 0.005120016492445361], ["-1.00 < diabetes <= 1.00", -0.0048456516436474655], ["redbloodcellcount > 0.12", -0.004674004342995174], ["-0.69 < cholesterol <= -0.23", 0.0031924833621692415], ["-0.86 < age <= 0.00", 0.0025536540467204546], ["smoking_status <= -1.29", 0.002322474168526758]], 2, exp_div);
                 
                 exp_div = top_div.append('div').classed('lime explanation', true);
-                exp.show([["family_history <= -0.50", -0.16265268223026083], ["hypertension <= -0.37", 0.09598637290693235], ["work_type <= -0.46", 0.09549314253353433], ["heart_disease <= -0.25", 0.08281568649016556], ["-1.00 < diabetes <= 1.00", -0.05738894589326567], ["redbloodcellcount > 0.12", -0.0537046211575658], ["alcohol <= -0.95", -0.04259057378790012], ["ever_married <= -1.53", -0.029528085197487765], ["-0.58 < bmi <= -0.22", -0.026072936265212517], ["-0.96 < residence_type <= 1.04", -0.02576174161068069]], 2, exp_div);
+                exp.show([["-1.00 < diabetes <= 1.00", 0.007771869848585012], ["work_type <= -0.46", 0.006797822366528682], ["heart_disease <= -0.25", 0.0057345571408347566], ["redbloodcellcount > 0.12", -0.0049627824617175685], ["family_history <= -0.50", -0.004718783169447639], ["hypertension <= -0.37", -0.0035377451161603362], ["ever_married <= -1.53", 0.003012485809105812], ["alcohol <= -0.95", 0.0027493477413765765], ["-0.31 < avg_glucose_level <= 0.38", -0.0025490766109313953], ["whitebloodcellcount > 0.15", -0.0023372636655983677]], 1, exp_div);
                 
                 exp_div = top_div.append('div').classed('lime explanation', true);
-                exp.show([["work_type <= -0.46", -0.315254011837787], ["redbloodcellcount > 0.12", 0.22576362244482748], ["family_history <= -0.50", 0.19774285883991935], ["-0.96 < residence_type <= 1.04", 0.09748782993333645], ["hypertension <= -0.37", 0.08537127761075931], ["ever_married <= -1.53", -0.07360602664609647], ["-0.13 < whitebloodcellcount <= 0.15", 0.039424377413508196], ["bpdiastolic <= -0.56", 0.036826499559371305], ["-0.86 < age <= 0.00", 0.03662359151383773], ["-0.31 < avg_glucose_level <= 0.38", 0.031764315135785946]], 0, exp_div);
+                exp.show([["work_type <= -0.46", -0.02433760258620437], ["redbloodcellcount > 0.12", 0.010823872524135223], ["family_history <= -0.50", 0.007635939537669535], ["whitebloodcellcount > 0.15", -0.007320026928750741], ["heart_disease <= -0.25", 0.005971081294554711], ["bpdiastolic <= -0.56", 0.005421918225292911], ["hypertension <= -0.37", 0.002861506800791097], ["smoking_status <= -1.29", -0.0028156858683239176], ["-0.69 < cholesterol <= -0.23", -0.002025776626870908], ["ever_married <= -1.53", -0.0019635157958102127]], 0, exp_div);
                 
         var raw_div = top_div.append('div');
-            exp.show_raw_tabular([["heart_disease", "-0.25", -0.37815625814979936], ["diabetes", "1.00", -0.13628957752977192], ["redbloodcellcount", "0.31", -0.10588445873793478], ["cholesterol", "-0.00", -0.0790225642504059], ["gender", "0.66", -0.07079253462557471], ["hypertension", "-0.37", 0.06473964166693172], ["age", "-0.46", -0.05201563532031825], ["smoking_status", "-1.29", 0.044698764522828165], ["family_history", "-0.50", 0.03653831376709234], ["alcohol", "-1.40", 0.026941615188323158]], 3, raw_div);
+            exp.show_raw_tabular([["heart_disease", "-0.25", -0.017294891619936647], ["whitebloodcellcount", "0.29", 0.0044650758709775225], ["hypertension", "-0.37", -0.004113841098190606], ["diabetes", "1.00", -0.0037569470427995444], ["family_history", "-0.50", 0.002697368621937468], ["residence_type", "1.04", -0.0015126036620433496], ["gender", "0.66", -0.001472142432429184], ["bpsystolic", "-0.07", -0.001435517994335984], ["bmi", "-0.23", 0.001298957474802539], ["age", "-0.46", -0.0012153185427599125]], 3, raw_div);
         
         </script>
         </body></html>

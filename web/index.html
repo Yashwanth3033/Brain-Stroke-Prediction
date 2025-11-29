@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI-Powered Stroke Detection System</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body>
     <div class="container">
@@ -14,20 +15,15 @@
         </div>
 
         <div class="algorithm-selector">
-            <div class="algorithm-card active" data-algorithm="random-forest">
-                <h3>🌳 Random Forest</h3>
-                <p>Ensemble Learning</p>
-            </div>
             <div class="algorithm-card" data-algorithm="neural-network">
-                <h3>🧠 Neural Network</h3>
+                <h3>🧠 CNN </h3>
                 <p>Deep Learning</p>
             </div>
             <div class="algorithm-card" data-algorithm="svm">
-                <h3>⚡ SVM</h3>
+                <h3>⚡ Gradient boosting</h3>
                 <p>Support Vector Machine</p>
             </div>
         </div>
-
         <div class="main-content">
             <div class="form-section">
                 <h2>Patient Information</h2>
@@ -106,6 +102,63 @@
                                 <option value="smokes">Currently Smokes</option>
                                 <option value="Unknown">Unknown</option>
                             </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="family_history">Family History</label>
+                            <select id="family_history" name="family_history" required>
+                                <option value="">Select</option>
+                                <option value="0">No</option>
+                                <option value="1">Yes</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="alcohol">Alcohol Consumption</label>
+                            <select id="alcohol" name="alcohol" required>
+                                <option value="">Select</option>
+                                <option value="0">None</option>
+                                <option value="1">Low</option>
+                                <option value="2">Moderate</option>
+                                <option value="3">High</option>
+                                <option value="4">Very High</option>
+                                <option value="5">Extreme</option>
+                                <option value="6">Unknown</option>
+                                <option value="8">Other</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="diabetes">Diabetes</label>
+                            <select id="diabetes" name="diabetes" required>
+                                <option value="">Select</option>
+                                <option value="0">No</option>
+                                <option value="1">Yes</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="BPsystolic">BP Systolic (mmHg)</label>
+                            <input type="number" id="BPsystolic" name="BPsystolic" min="70" max="250" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="BPDiastolic">BP Diastolic (mmHg)</label>
+                            <input type="number" id="BPDiastolic" name="BPDiastolic" min="40" max="150" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="cholesterol">Cholesterol (mg/dL)</label>
+                            <input type="number" id="cholesterol" name="cholesterol" min="100" max="400" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="whitebloodcellcount">White Blood Cell Count</label>
+                            <input type="number" id="whitebloodcellcount" name="whitebloodcellcount" min="2000" max="20000" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="redbloodcellcount">Red Blood Cell Count</label>
+                            <input type="number" id="redbloodcellcount" name="redbloodcellcount" min="2.5" max="7.0" step="0.1" required>
                         </div>
                     </div>
                     <button type="submit" class="predict-btn">🔍 Analyze Stroke Risk</button>

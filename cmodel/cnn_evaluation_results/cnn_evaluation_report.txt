@@ -3,7 +3,7 @@
 CNN MODEL EVALUATION REPORT
 ======================================================================
 
-📅 Evaluation Date: 2025-10-23 02:53:40
+📅 Evaluation Date: 2025-11-29 01:38:08
 📊 Model Type: Keras/TensorFlow Sequential (CNN/Dense)
 🎯 Task: Multi-class Classification
 
@@ -27,17 +27,17 @@ result
 PERFORMANCE METRICS (ON TEST DATA)
 ======================================================================
 
-OVERALL ACCURACY: 0.9620 (96.20%)
+OVERALL ACCURACY: 0.9229 (92.29%)
 
 WEIGHTED METRICS (Accounts for Class Imbalance):
-  - Precision: 0.9626
-  - Recall:    0.9620
-  - F1-Score:  0.9619
+  - Precision: 0.9319
+  - Recall:    0.9229
+  - F1-Score:  0.9234
 
 MACRO METRICS (Equal Weight Per Class):
-  - Precision: 0.9621
-  - Recall:    0.9625
-  - F1-Score:  0.9619
+  - Precision: 0.9336
+  - Recall:    0.9230
+  - F1-Score:  0.9244
 
 ======================================================================
 PER-CLASS PERFORMANCE (ON TEST DATA)
@@ -45,24 +45,24 @@ PER-CLASS PERFORMANCE (ON TEST DATA)
 
               precision    recall  f1-score   support
 
-     Class 0     0.9483    0.9689    0.9585       644
-     Class 1     0.9632    0.9742    0.9687       698
-     Class 2     0.9877    0.9241    0.9548       698
-     Class 3     0.9491    0.9829    0.9657       645
+     Class 0     0.9690    0.9720    0.9705       644
+     Class 1     0.9690    0.8496    0.9053       698
+     Class 2     0.8153    0.9928    0.8953       698
+     Class 3     0.9809    0.8775    0.9264       645
 
-    accuracy                         0.9620      2685
-   macro avg     0.9621    0.9625    0.9619      2685
-weighted avg     0.9626    0.9620    0.9619      2685
+    accuracy                         0.9229      2685
+   macro avg     0.9336    0.9230    0.9244      2685
+weighted avg     0.9319    0.9229    0.9234      2685
 
 
 ======================================================================
 CONFUSION MATRIX (ON TEST DATA)
 ======================================================================
 
-[[624  12   1   7]
- [  6 680   7   5]
- [ 21  10 645  22]
- [  7   4   0 634]]
+[[626   6  12   0]
+ [  8 593  86  11]
+ [  4   1 693   0]
+ [  8  12  59 566]]
 
 ======================================================================
 TOP 10 MOST IMPORTANT FEATURES (FROM SHAP ON TEST DATA)

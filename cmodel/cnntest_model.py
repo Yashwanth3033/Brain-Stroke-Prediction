@@ -1,373 +1,606 @@
-#cnntest_model.py
-# Convolutional Neural Network Model - Test & cnntest_model.py
+# =========================================================
+# 🔬 COMPREHENSIVE CNN MODEL EVALUATION WITH LIME & SHAP
+# =========================================================
 import pandas as pd
 import numpy as np
 import os
 import joblib
-import seaborn as sns
 import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    classification_report,
+    confusion_matrix,
+    roc_curve,
+    auc,
+    roc_auc_score
+)
 from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 from tensorflow.keras.models import load_model
 from tensorflow.keras.utils import to_categorical
+import lime
+import lime.lime_tabular
 import shap
-from lime import lime_tabular
 import warnings
 
-warnings.filterwarnings('ignore', category=FutureWarning)
+warnings.filterwarnings('ignore')
+plt.style.use('seaborn-v0_8-whitegrid')
+sns.set_palette("husl")
 
-# -----------------------------
-# 1️⃣ Paths & Load Data
-# -----------------------------
-datasets_path = "../datasets"  # Adjust if needed
-test_file = os.path.join(datasets_path, "test_dataset.xlsx")
+# =========================================================
+# 📁 PATH CONFIGURATION
+# =========================================================
+DATA_DIR = "../datasets"
+MODEL_DIR = "."
+RESULTS_DIR = "cnn_evaluation_results"
+os.makedirs(RESULTS_DIR, exist_ok=True)
 
-test_data = pd.read_excel(test_file)
+MODEL_PATH = os.path.join(MODEL_DIR, "cnn_model.keras")
+IMPUTATION_PATH = os.path.join(MODEL_DIR, "imputation_values.pkl")
+ENCODER_PATH = os.path.join(MODEL_DIR, "label_encoders.pkl")
+SCALER_PATH = os.path.join(MODEL_DIR, "scaler.pkl")
 
-# Normalize column names
-test_data.columns = test_data.columns.str.lower()
+TRAIN_FILE = os.path.join(DATA_DIR, "train_dataset.xlsx")
+TEST_FILE = os.path.join(DATA_DIR, "test_dataset.xlsx")
 
-# Replace "?" with NaN
-test_data.replace("?", np.nan, inplace=True)
+# =========================================================
+# 📊 LOAD MODEL ARTIFACTS AND PREPROCESS DATA
+# =========================================================
+print("=" * 70)
+print("📂 LOADING MODEL ARTIFACTS AND PREPROCESSING DATA")
+print("=" * 70)
 
-# -----------------------------
-# 2️⃣ Handle Missing Values
-# -----------------------------
-for col in test_data.columns:
-    if test_data[col].dtype in [np.float64, np.int64]:
-        median_val = test_data[col].median()
-        test_data[col] = test_data[col].fillna(median_val)
-    else:
-        mode_val = test_data[col].mode()[0]
-        test_data[col] = test_data[col].fillna(mode_val)
+try:
+    model = load_model(MODEL_PATH)
+    imputation_values = joblib.load(IMPUTATION_PATH)
+    label_encoders = joblib.load(ENCODER_PATH)
+    scaler = joblib.load(SCALER_PATH)
 
-# -----------------------------
-# 3️⃣ Encode Categorical Columns
-# -----------------------------
-cat_cols = ["gender", "ever_married", "work_type",
-            "residence_type", "smoking_status", "alcohol"]
+    print(f"✅ Model loaded from: {MODEL_PATH}")
+    print(f"✅ Imputation values loaded from: {IMPUTATION_PATH}")
+    print(f"✅ Encoders loaded from: {ENCODER_PATH}")
+    print(f"✅ Scaler loaded from: {SCALER_PATH}")
 
-for col in cat_cols:
-    if col in test_data.columns:
-        le = LabelEncoder()
-        test_data[col] = le.fit_transform(test_data[col].astype(str))
+    train_data_raw = pd.read_excel(TRAIN_FILE)
+    test_data_raw = pd.read_excel(TEST_FILE)
 
-# -----------------------------
-# 4️⃣ Split Features & Target
-# -----------------------------
-X_test = test_data.drop("result", axis=1)
-y_test = test_data["result"]
+    print(f"✅ Raw training data loaded: {train_data_raw.shape}")
+    print(f"✅ Raw test data loaded: {test_data_raw.shape}")
 
-# Store feature names for SHAP and LIME
-feature_names = X_test.columns.tolist()
+except FileNotFoundError as e:
+    print(f"❌ Error: {e}")
+    print("👉 Please run the 'cnntrain_model.py' script first to generate artifacts!")
+    exit()
 
-# -----------------------------
-# 5️⃣ Load existing scaler & scale test data
-# -----------------------------
-scaler = joblib.load("scaler.pkl")
+
+# --- Re-apply the exact preprocessing pipeline from training ---
+
+def preprocess_data(df, impute_vals, encoders, fit_encoders=False):
+    """
+    Applies the full preprocessing pipeline using loaded artifacts.
+    """
+    df = df.copy()
+    df.columns = df.columns.str.lower()
+    df.replace("?", np.nan, inplace=True)
+
+    # 1. Impute Missing Values
+    for col, val in impute_vals.items():
+        if col in df.columns:
+            df[col] = df[col].fillna(val)
+
+    # 2. Encode Categorical Columns
+    cat_cols = ["gender", "ever_married", "work_type",
+                "residence_type", "smoking_status", "alcohol"]
+
+    for col in cat_cols:
+        if col in df.columns:
+            le = encoders[col]
+
+            test_col_str = df[col].astype(str)
+            unseen_mask = ~test_col_str.isin(le.classes_)
+
+            if unseen_mask.any():
+                print(f"⚠️  Warning: {unseen_mask.sum()} unseen categories found in '{col}'.")
+                try:
+                    most_frequent_val_from_training = impute_vals[col]
+                    most_frequent_encoded = le.transform([most_frequent_val_from_training])[0]
+                    most_frequent_class_str = le.classes_[most_frequent_encoded]
+                    test_col_str[unseen_mask] = most_frequent_class_str
+                    print(f"    Mapped unseen to '{most_frequent_class_str}'")
+                except Exception:
+                    fallback_class = le.classes_[0]
+                    test_col_str[unseen_mask] = fallback_class
+                    print(f"    Mapped unseen to fallback '{fallback_class}'")
+
+            df[col] = le.transform(test_col_str)
+
+    return df
+
+
+print("\n🔄 Applying preprocessing pipeline...")
+train_data_processed = preprocess_data(train_data_raw, imputation_values, label_encoders)
+test_data_processed = preprocess_data(test_data_raw, imputation_values, label_encoders)
+
+# --- Split Features & Target ---
+X_train = train_data_processed.drop("result", axis=1)
+y_train_labels = train_data_processed["result"]
+X_test = test_data_processed.drop("result", axis=1)
+y_test_labels = test_data_processed["result"]
+
+# --- Scale Data ---
+X_train_scaled = scaler.transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
-# -----------------------------
-# TECHNIQUE 1: Feature Dropout (randomly zero out features)
-# -----------------------------
-np.random.seed(42)
-# --- KEEP THIS AS IT IS ---
-# Dropout rate set to 0.1 (10%) to manipulate results
-dropout_rate = 0.1
-X_test_dropout = X_test_scaled.copy()
-dropout_mask = np.random.binomial(1, 1-dropout_rate, X_test_scaled.shape)
-X_test_dropout = X_test_dropout * dropout_mask
-# Choose which technique to use
-X_test_modified = X_test_dropout  # Change this to use different techniques
+print("✅ Preprocessing complete.")
 
-# Convert target to categorical for multi-class
-y_test_cat = to_categorical(y_test)
+# --- Define Metadata ---
+feature_names = list(X_test.columns)
+class_labels = sorted(y_test_labels.unique())
+n_classes = len(class_labels)
 
-# -----------------------------
-# 6️⃣ Load trained CNN model
-# -----------------------------
-cnn_model = load_model("cnn_model.keras")
-num_classes = cnn_model.output_shape[-1]  # Get number of classes from model output
+# Define class names
+if n_classes == 2:
+    class_names = ['No Stroke', 'Stroke']
+else:
+    class_names = [f'Class {i}' for i in class_labels]
 
-# -----------------------------
-# 7️⃣ Predict and evaluate
-# -----------------------------
-y_pred_cnn = np.argmax(cnn_model.predict(X_test_modified), axis=1)
-report_cnn = classification_report(y_test, y_pred_cnn, output_dict=True)
-report_cnn_text = classification_report(y_test, y_pred_cnn)
-cm_cnn = confusion_matrix(y_test, y_pred_cnn)
-accuracy = accuracy_score(y_test, y_pred_cnn)
+print(f"\n📊 Model Information:")
+print(f"   Features: {len(feature_names)}")
+print(f"   Classes: {n_classes} ({', '.join(class_names)})")
 
-# -----------------------------
-# 8️⃣ Create Results Folder
-# -----------------------------
-results_folder = "cnn_results"
-os.makedirs(results_folder, exist_ok=True)
+# =========================================================
+# 🎯 GENERATE PREDICTIONS (ON TEST DATA)
+# =========================================================
+print("\n" + "=" * 70)
+print("🎯 GENERATING PREDICTIONS (ON TEST DATA)")
+print("=" * 70)
 
-# -----------------------------
-# 9️⃣ Display & Save Basic Results
-# -----------------------------
-print(f"Tested on {X_test_scaled.shape[0]} samples and {X_test_scaled.shape[1]} features.")
-print(f"\nCNN Test Accuracy (with Feature Dropout): {accuracy*100:.2f}%\n")
-print("===== CNN Classification Report =====")
-print(report_cnn_text)
+y_pred_proba = model.predict(X_test_scaled)
+y_pred = np.argmax(y_pred_proba, axis=1)
+y_test_cat = to_categorical(y_test_labels, num_classes=n_classes)
 
-# Save classification report to text file
-with open(os.path.join(results_folder, "classification_report.txt"), "w") as f:
-    f.write(f"Tested on {X_test_scaled.shape[0]} samples and {X_test_scaled.shape[1]} features.\n\n")
-    f.write(f"CNN Test Accuracy (with Feature Dropout): {accuracy*100:.2f}%\n\n")
-    f.write("===== CNN Classification Report =====\n")
-    f.write(report_cnn_text)
-print("✓ Classification report saved")
+print(f"✅ Predictions generated for {len(y_pred)} samples")
 
-# Confusion Matrix Heatmap
-plt.figure(figsize=(6, 5))
-sns.heatmap(cm_cnn, annot=True, fmt="d", cmap="Greens")
-plt.title("CNN - Confusion Matrix")
-plt.xlabel("Predicted")
-plt.ylabel("Actual")
+# =========================================================
+# 📊 PERFORMANCE METRICS (ON TEST PREDICTIONS)
+# =========================================================
+print("\n" + "=" * 70)
+print("📊 PERFORMANCE METRICS (ON TEST PREDICTIONS)")
+print("=" * 70)
+
+accuracy = accuracy_score(y_test_labels, y_pred)
+precision_weighted = precision_score(y_test_labels, y_pred, average='weighted', zero_division=0)
+recall_weighted = recall_score(y_test_labels, y_pred, average='weighted', zero_division=0)
+f1_weighted = f1_score(y_test_labels, y_pred, average='weighted', zero_division=0)
+
+precision_macro = precision_score(y_test_labels, y_pred, average='macro', zero_division=0)
+recall_macro = recall_score(y_test_labels, y_pred, average='macro', zero_division=0)
+f1_macro = f1_score(y_test_labels, y_pred, average='macro', zero_division=0)
+
+print("\n" + "=" * 40)
+print("WEIGHTED METRICS (Accounts for Class Imbalance)")
+print("=" * 40)
+print(f"Accuracy:  {accuracy:.4f} ({accuracy * 100:.2f}%)")
+print(f"Precision: {precision_weighted:.4f} ({precision_weighted * 100:.2f}%)")
+print(f"Recall:    {recall_weighted:.4f} ({recall_weighted * 100:.2f}%)")
+print(f"F1-Score:  {f1_weighted:.4f} ({f1_weighted * 100:.2f}%)")
+
+print("\n" + "=" * 40)
+print("MACRO METRICS (Equal Weight Per Class)")
+print("=" * 40)
+print(f"Precision: {precision_macro:.4f} ({precision_macro * 100:.2f}%)")
+print(f"Recall:    {recall_macro:.4f} ({recall_macro * 100:.2f}%)")
+print(f"F1-Score:  {f1_macro:.4f} ({f1_macro * 100:.2f}%)")
+
+metrics_df = pd.DataFrame({
+    'Metric': ['Accuracy', 'Precision (Weighted)', 'Recall (Weighted)',
+               'F1-Score (Weighted)', 'Precision (Macro)', 'Recall (Macro)', 'F1-Score (Macro)'],
+    'Value': [accuracy, precision_weighted, recall_weighted, f1_weighted,
+              precision_macro, recall_macro, f1_macro]
+})
+metrics_df.to_csv(os.path.join(RESULTS_DIR, 'cnn_performance_metrics.csv'), index=False)
+
+# =========================================================
+# 📋 DETAILED CLASSIFICATION REPORT (ON TEST PREDICTIONS)
+# =========================================================
+print("\n" + "=" * 70)
+print("📋 DETAILED CLASSIFICATION REPORT (ON TEST PREDICTIONS)")
+print("=" * 70)
+
+present_labels = sorted(y_test_labels.unique())
+present_class_names = [class_names[i] for i in present_labels]
+
+report = classification_report(
+    y_test_labels,
+    y_pred,
+    labels=present_labels,
+    target_names=present_class_names,
+    digits=4
+)
+print("\n", report)
+
+report_dict = classification_report(
+    y_test_labels,
+    y_pred,
+    labels=present_labels,
+    target_names=present_class_names,
+    output_dict=True,
+    digits=4
+)
+report_df = pd.DataFrame(report_dict).transpose()
+report_df.to_csv(os.path.join(RESULTS_DIR, 'cnn_classification_report.csv'))
+
+# =========================================================
+# 📈 CONFUSION MATRIX (ON TEST PREDICTIONS)
+# =========================================================
+print("\n" + "=" * 70)
+print("📈 CONFUSION MATRIX (ON TEST PREDICTIONS)")
+print("=" * 70)
+
+cm = confusion_matrix(y_test_labels, y_pred, labels=present_labels)
+print("\nRaw Confusion Matrix:")
+print(cm)
+
+plt.figure(figsize=(10, 8))
+sns.heatmap(
+    cm,
+    annot=True,
+    fmt='d',
+    cmap='Greens',
+    xticklabels=present_class_names,
+    yticklabels=present_class_names,
+    cbar_kws={'label': 'Count'},
+    square=True
+)
+plt.title('Confusion Matrix - CNN (Test Set)', fontsize=16, fontweight='bold', pad=20)
+plt.ylabel('True Label', fontsize=12)
+plt.xlabel('Predicted Label', fontsize=12)
+plt.xticks(rotation=45, ha='right')
+plt.yticks(rotation=0)
 plt.tight_layout()
-plt.savefig(os.path.join(results_folder, "confusion_matrix.png"), dpi=300, bbox_inches='tight')
+plt.savefig(os.path.join(RESULTS_DIR, 'cnn_confusion_matrix.png'), dpi=300, bbox_inches='tight')
+print(f"\n💾 Confusion matrix saved: {RESULTS_DIR}/cnn_confusion_matrix.png")
 plt.close()
-print("✓ Confusion matrix saved")
 
-# -----------------------------
-# 🔟 SHAP Analysis
-# -----------------------------
-print("\n📊 Generating SHAP explanations...")
+cm_normalized = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+plt.figure(figsize=(10, 8))
+sns.heatmap(
+    cm_normalized,
+    annot=True,
+    fmt='.2%',
+    cmap='Greens',
+    xticklabels=present_class_names,
+    yticklabels=present_class_names,
+    cbar_kws={'label': 'Percentage'},
+    square=True
+)
+plt.title('Normalized Confusion Matrix - CNN (Test Set)', fontsize=16, fontweight='bold', pad=20)
+plt.ylabel('True Label', fontsize=12)
+plt.xlabel('Predicted Label', fontsize=12)
+plt.xticks(rotation=45, ha='right')
+plt.yticks(rotation=0)
+plt.tight_layout()
+plt.savefig(os.path.join(RESULTS_DIR, 'cnn_confusion_matrix_normalized.png'), dpi=300, bbox_inches='tight')
+print(f"💾 Normalized confusion matrix saved: {RESULTS_DIR}/cnn_confusion_matrix_normalized.png")
+plt.close()
 
-def model_predict(X):
-    if X.ndim == 1:
-        X = X.reshape(1, -1)
-    return cnn_model.predict(X, verbose=0)
+# =========================================================
+# 📊 ROC CURVE AND AUC (ON TEST PREDICTIONS)
+# =========================================================
+print("\n" + "=" * 70)
+print("📊 ROC CURVE AND AUC SCORE (ON TEST PREDICTIONS)")
+print("=" * 70)
 
-# Use a smaller subset
-shap_sample_size = min(100, X_test_modified.shape[0])
-X_shap_sample = X_test_modified[:shap_sample_size]
-
-print(f"Initializing SHAP explainer with {shap_sample_size} samples...")
-background = shap.kmeans(X_test_modified, 50).data
-explainer = shap.KernelExplainer(model_predict, background)
-
-print("Calculating SHAP values (this may take a few minutes)...")
-shap_values = explainer.shap_values(X_shap_sample)
-
-# Debug shape information
-print(f"SHAP values shape: {[np.array(sv).shape for sv in shap_values]}")
-print(f"Features shape: {X_shap_sample.shape}")
-
-# SHAP Summary Plot (bar)
-print("Generating SHAP summary bar plot...")
-try:
-    # Reshape SHAP values for proper averaging
-    all_shap_values = np.array(shap_values)  # Shape: (n_classes, n_features, n_samples)
-    mean_abs_shap = np.abs(all_shap_values).mean(axis=(0, 2))  # Average across classes and samples
-    
-    # Sort features by importance
-    feature_importance = pd.DataFrame({
-        'feature': feature_names,
-        'importance': mean_abs_shap
-    }).sort_values('importance')
-    
-    # Create bar plot
+if n_classes == 2:
+    fpr, tpr, _ = roc_curve(y_test_labels, y_pred_proba[:, 1])
+    roc_auc = auc(fpr, tpr)
     plt.figure(figsize=(10, 8))
-    plt.barh(range(len(feature_importance)), feature_importance['importance'])
-    plt.yticks(range(len(feature_importance)), feature_importance['feature'])
-    plt.xlabel('Mean |SHAP value|')
-    plt.title('Feature Importance (Mean Absolute SHAP Values)')
+    plt.plot(fpr, tpr, color='darkgreen', lw=2, label=f'ROC curve (AUC = {roc_auc:.4f})')
+    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--', label='Random Classifier')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate', fontsize=12)
+    plt.ylabel('True Positive Rate', fontsize=12)
+    plt.title('Receiver Operating Characteristic (ROC) Curve - CNN', fontsize=16, fontweight='bold')
+    plt.legend(loc="lower right", fontsize=11)
+    plt.grid(alpha=0.3)
     plt.tight_layout()
-    plt.savefig(os.path.join(results_folder, "shap_summary_bar.png"), dpi=300, bbox_inches='tight')
-    print("✓ SHAP summary bar plot saved")
-except Exception as e:
-    print(f"⚠️ Could not generate summary bar plot: {str(e)}")
-finally:
+    plt.savefig(os.path.join(RESULTS_DIR, 'cnn_roc_curve.png'), dpi=300, bbox_inches='tight')
+    print(f"✅ ROC AUC Score: {roc_auc:.4f}")
+    print(f"💾 ROC curve saved: {RESULTS_DIR}/cnn_roc_curve.png")
     plt.close()
-
-# SHAP Summary Plot (beeswarm)
-print("Generating SHAP summary beeswarm plot...")
-try:
-    plt.figure(figsize=(10, 8))
-    # Get SHAP values for first class and reshape properly
-    class_idx = 0  # Use first class for visualization
-    class_shap_values = shap_values[class_idx]  # Shape: (18, 4)
-    
-    # Reshape SHAP values to match sample count
-    shap_values_reshaped = np.zeros((X_shap_sample.shape[0], X_shap_sample.shape[1]))
-    for i in range(X_shap_sample.shape[1]):  # For each feature
-        shap_values_reshaped[:, i] = class_shap_values[i].mean()  # Average impact per feature
-    
-    shap.summary_plot(
-        shap_values_reshaped,
-        X_shap_sample,
-        feature_names=feature_names,
-        show=False,
-        plot_type="dot"  # Explicitly set to dot plot
-    )
-    plt.title(f"SHAP Impact Distribution (Class {class_idx})")
-    plt.tight_layout()
-    plt.savefig(os.path.join(results_folder, "shap_summary_beeswarm.png"), dpi=300, bbox_inches='tight')
-    print("✓ SHAP summary beeswarm plot saved")
-except Exception as e:
-    print(f"⚠️ Could not generate beeswarm plot: {str(e)}")
-finally:
-    plt.close()
-
-# SHAP Waterfall Plot
-print("Generating SHAP waterfall plot...")
-try:
-    plt.figure(figsize=(10, 8))
-    # Get prediction and SHAP values for first sample
-    pred_probs = model_predict(X_shap_sample[0:1])
-    pred_class = np.argmax(pred_probs[0])
-    
-    # Create explanation object
-    waterfall_exp = shap.Explanation(
-        values=shap_values[pred_class][:, 0],  # Values for predicted class
-        base_values=explainer.expected_value[pred_class],
-        data=X_shap_sample[0],
-        feature_names=feature_names
-    )
-    
-    shap.plots.waterfall(waterfall_exp, show=False)
-    plt.title(f"SHAP Waterfall Plot (Sample 0, Predicted Class: {pred_class})")
-    plt.tight_layout()
-    plt.savefig(os.path.join(results_folder, "shap_waterfall_sample_0.png"), dpi=300, bbox_inches='tight')
-    print("✓ SHAP waterfall plot saved")
-except Exception as e:
-    print(f"⚠️ Could not generate waterfall plot: {str(e)}")
-finally:
-    plt.close()
-
-# SHAP Force Plot for first prediction
-print("Generating SHAP force plot...")
-try:
-    plt.figure(figsize=(20, 3))
-    # Get prediction for first sample
-    pred_probs = model_predict(X_shap_sample[0:1])
-    pred_class = np.argmax(pred_probs[0])
-    
-    # Create force plot using matplotlib
-    shap.plots.force(
-        explainer.expected_value[pred_class],
-        shap_values[pred_class][:, 0],
-        X_shap_sample[0],
-        feature_names=feature_names,
-        matplotlib=True,
-        show=False
-    )
-    plt.title(f"SHAP Force Plot (Sample 0, Predicted Class: {pred_class})")
-    plt.tight_layout()
-    plt.savefig(os.path.join(results_folder, "shap_force_sample_0.png"), dpi=300, bbox_inches='tight')
-    print("✓ SHAP force plot saved")
-except Exception as e:
-    print(f"⚠️ Could not generate force plot: {str(e)}")
-finally:
-    plt.close()
-
-# SHAP Dependence plots for top 3 features
-print("Generating SHAP dependence plots...")
-try:
-    # Calculate global feature importance across all classes
-    all_shap_values = np.array(shap_values)
-    feature_importance_values = np.abs(all_shap_values).mean(axis=(0, 2))
-    top_features_idx = np.argsort(feature_importance_values)[-3:][::-1]
-    
-    # Define which class to plot the dependence for
-    CLASS_TO_PLOT = 1
-    print(f"Generating SHAP dependence plots for Class {CLASS_TO_PLOT}...")
-    
-    for idx in top_features_idx:
-        feature_name = feature_names[idx]
-        plt.figure(figsize=(8, 6))
-        
-        # Get SHAP values for the specific class and transpose to correct shape
-        # shap_values[CLASS_TO_PLOT] has shape (n_features, n_samples)
-        # We need (n_samples, n_features)
-        class_shap_transposed = shap_values[CLASS_TO_PLOT].T
-        
-        shap.dependence_plot(
-            ind=feature_name,
-            shap_values=class_shap_transposed,
-            features=X_shap_sample,
-            feature_names=feature_names,
-            show=False
-        )
-        plt.title(f"SHAP Dependence for '{feature_name}' (Class {CLASS_TO_PLOT})")
+else:
+    try:
+        roc_auc_ovr = roc_auc_score(y_test_cat, y_pred_proba, multi_class='ovr', average='weighted')
+        print(f"✅ ROC AUC Score (One-vs-Rest, Weighted): {roc_auc_ovr:.4f}")
+        plt.figure(figsize=(10, 8))
+        for i, class_name in enumerate(present_class_names):
+            fpr, tpr, _ = roc_curve(y_test_cat[:, i], y_pred_proba[:, i])
+            roc_auc = auc(fpr, tpr)
+            plt.plot(fpr, tpr, lw=2, label=f'ROC curve for {class_name} (AUC = {roc_auc:.2f})')
+        plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--', label='Random Classifier')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate', fontsize=12)
+        plt.ylabel('True Positive Rate', fontsize=12)
+        plt.title('Multi-Class Receiver Operating Characteristic (ROC) Curve - CNN', fontsize=16, fontweight='bold')
+        plt.legend(loc="lower right", fontsize=10)
+        plt.grid(alpha=0.3)
         plt.tight_layout()
-        plt.savefig(os.path.join(results_folder, f"shap_dependence_{feature_name}_class_{CLASS_TO_PLOT}.png"),
-                    dpi=300, bbox_inches='tight')
+        plt.savefig(os.path.join(RESULTS_DIR, 'cnn_roc_curve.png'), dpi=300, bbox_inches='tight')
+        print(f"💾 Multi-class ROC curve saved: {RESULTS_DIR}/cnn_roc_curve.png")
         plt.close()
-    print(f"✓ SHAP dependence plots saved for top 3 features")
-except Exception as e:
-    print(f"⚠️ Could not generate dependence plots: {str(e)}")
+    except ValueError as e:
+        print(f"⚠️  Could not calculate AUC: {e}")
 
-# -----------------------------
-# 1️⃣1️⃣ LIME Analysis
-# -----------------------------
-print("\n🔍 Generating LIME explanations...")
+# =========================================================
+# 🔍 LIME INTERPRETATION (ON TEST DATA)
+# =========================================================
+print("\n" + "=" * 70)
+print("🔍 LIME - INTERPRETATIONS (ON TEST DATA)")
+print("=" * 70)
 
-def predict_fn(x):
-    # Ensure proper shape and return probabilities
-    if x.ndim == 1:
-        x = x.reshape(1, -1)
-    return model_predict(x)
-
-# Create LIME explainer with proper training data
-lime_explainer = lime_tabular.LimeTabularExplainer(
-    training_data=X_test_modified,
+explainer_lime = lime.lime_tabular.LimeTabularExplainer(
+    training_data=X_train_scaled,
     feature_names=feature_names,
-    class_names=[f'Class {i}' for i in range(num_classes)],
+    class_names=class_names,
     mode='classification',
     random_state=42
 )
 
-# Explain first 5 predictions
-num_samples_to_explain = min(5, len(X_test_modified))
+print("\n📊 Generating LIME explanations...")
+num_samples = min(5, len(X_test_scaled))
 
-for i in range(num_samples_to_explain):
-    try:
-        # Get explanation for instance
-        exp = lime_explainer.explain_instance(
-            X_test_modified[i],
-            predict_fn,
-            num_features=10,
-            top_labels=1,
-            num_samples=500
+for i in range(num_samples):
+    print(f"\n--- Instance {i + 1} ---")
+    print(f"   True Label: {y_test_labels.iloc[i]} ({class_names[y_test_labels.iloc[i]]})")
+
+    instance_probs = model.predict(X_test_scaled[i:i + 1])[0]
+    instance_pred_class = np.argmax(instance_probs)
+    print(f"   Predicted: {instance_pred_class} ({class_names[instance_pred_class]})")
+    print(f"   Probabilities: {[f'{p:.3f}' for p in instance_probs]}")
+
+    exp = explainer_lime.explain_instance(
+        X_test_scaled[i],
+        model.predict,
+        num_features=10,
+        top_labels=n_classes
+    )
+
+    exp.save_to_file(os.path.join(RESULTS_DIR, f'cnn_lime_explanation_{i + 1}.html'))
+
+    print(f"\n   Top 10 Feature Contributions (for {class_names[instance_pred_class]}):")
+    for feature, weight in exp.as_list(label=instance_pred_class)[:10]:
+        print(f"         {feature}: {weight:+.4f}")
+
+print(f"\n💾 LIME explanations saved: {RESULTS_DIR}/cnn_lime_explanation_*.html")
+
+# =========================================================
+# 🎨 SHAP INTERPRETATION (ON TEST DATA)
+# =========================================================
+print("\n" + "=" * 70)
+print("🎨 SHAP - INTERPRETATIONS (ON TEST DATA)")
+print("=" * 70)
+
+print("\n📊 Computing SHAP values...")
+
+try:
+    background_data = shap.utils.sample(X_train_scaled, 100)
+    explainer_shap = shap.DeepExplainer(model, background_data)
+
+    sample_size = min(100, len(X_test_scaled))
+    X_test_sample = X_test_scaled[:sample_size]
+
+    shap_values = explainer_shap.shap_values(X_test_sample)
+    X_test_sample_df = pd.DataFrame(X_test_sample, columns=feature_names)
+
+    print(f"✅ SHAP values computed for {sample_size} samples")
+
+    print("\n📊 Generating SHAP visualizations...")
+    plt.figure(figsize=(12, 8))
+
+    class_idx = 1 if isinstance(shap_values, list) else 0
+    values_to_plot = shap_values[class_idx] if isinstance(shap_values, list) else shap_values
+
+    shap.summary_plot(
+        values_to_plot,
+        X_test_sample_df,
+        plot_type="bar",
+        show=False
+    )
+    plt.title('SHAP Feature Importance')
+    plt.tight_layout()
+    plt.savefig(os.path.join(RESULTS_DIR, 'cnn_shap_summary.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+    print("✅ SHAP summary plot saved")
+
+    if isinstance(shap_values, list):
+        mean_abs_shap = np.mean([np.abs(s).mean(0) for s in shap_values], axis=0)
+    else:
+        mean_abs_shap = np.abs(shap_values).mean(0)
+
+    shap_importance = pd.DataFrame({
+        'Feature': feature_names,
+        'SHAP_Importance': mean_abs_shap
+    })
+    shap_importance = shap_importance.sort_values('SHAP_Importance', ascending=False)
+    shap_importance['SHAP_Rank'] = range(1, len(feature_names) + 1)
+
+    shap_importance.to_csv(os.path.join(RESULTS_DIR, 'cnn_shap_feature_importance.csv'), index=False)
+
+    print("\n📊 Generating SHAP waterfall plots...")
+    for i in range(min(3, sample_size)):
+        plt.figure(figsize=(10, 6))
+
+        pred = model.predict(X_test_sample[i:i + 1])[0]
+        pred_class = np.argmax(pred)
+
+        exp = shap.Explanation(
+            values=values_to_plot[i],
+            base_values=explainer_shap.expected_value[class_idx],
+            data=X_test_sample[i],
+            feature_names=feature_names
         )
-        
-        # Get predicted class
-        pred_class = np.argmax(predict_fn(X_test_modified[i]))
-        
-        # Create visualization
-        plt.figure(figsize=(12, 6))
-        exp.as_pyplot_figure(label=pred_class)
-        plt.title(f"LIME Explanation - Sample {i} (Predicted: Class {pred_class})")
+
+        shap.plots.waterfall(exp, show=False)
+        plt.title(f'SHAP Values for Sample {i + 1}\nPredicted Class: {class_names[pred_class]}')
         plt.tight_layout()
-        plt.savefig(os.path.join(results_folder, f"lime_explanation_sample_{i}.png"),
-                    dpi=300, bbox_inches='tight')
+        plt.savefig(os.path.join(RESULTS_DIR, f'cnn_shap_waterfall_{i + 1}.png'), dpi=300, bbox_inches='tight')
         plt.close()
-        print(f"✓ LIME explanation saved for sample {i}")
-    except Exception as e:
-        print(f"⚠️ Could not generate LIME explanation for sample {i}: {str(e)}")
+        print(f"✅ Waterfall plot {i + 1} saved")
 
-print(f"✓ LIME explanations saved for {num_samples_to_explain} samples")
+except Exception as e:
+    print(f"⚠️ Error in SHAP analysis: {str(e)}")
+    shap_importance = pd.DataFrame(columns=['Feature', 'SHAP_Importance', 'SHAP_Rank'])
 
-# -----------------------------
-# 1️⃣2️⃣ Summary
-# -----------------------------
-print(f"\n{'='*60}")
-print(f"✅ All results saved in '{results_folder}/' folder")
-print(f"{'='*60}")
-print("\nGenerated files:")
-print("  1. classification_report.txt")
-print("  2. confusion_matrix.png")
-print("  3. shap_summary_bar.png")
-print("  4. shap_summary_beeswarm.png")
-print("  5. shap_waterfall_sample_0.png")
-print("  6. shap_force_sample_0.png")
-print(f"  7-9. shap_dependence_[feature]_class_1.png (3 plots)")
-print(f"  10-14. lime_explanation_sample_[0-4].png (5 plots)")
-print(f"\nTotal: ~14 files")
-print(f"\n{'='*60}")
-print("🎯 CNN Explainability Analysis Complete!")
-print(f"{'='*60}")
+print(f"\n💾 SHAP visualizations saved: {RESULTS_DIR}/cnn_shap_*.png")
+
+# =========================================================
+# 📝 GENERATE EVALUATION REPORT
+# =========================================================
+print("\n" + "=" * 70)
+print("📝 GENERATING EVALUATION REPORT")
+print("=" * 70)
+
+if 'shap_importance' not in locals():
+    shap_importance = pd.DataFrame({
+        'Feature': feature_names,
+        'SHAP_Importance': [0] * len(feature_names)
+    })
+
+report_content = f"""
+{'=' * 70}
+CNN MODEL EVALUATION REPORT
+{'=' * 70}
+
+📅 Evaluation Date: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}
+📊 Model Type: Keras/TensorFlow Sequential (CNN/Dense)
+🎯 Task: {'Binary' if n_classes == 2 else 'Multi-class'} Classification
+
+{'=' * 70}
+DATASET INFORMATION
+{'=' * 70}
+
+Training Samples: {len(X_train)}
+Test Samples: {len(X_test)}
+Number of Features: {len(feature_names)}
+Number of Classes: {n_classes}
+
+Class Distribution (Test Set):
+{y_test_labels.value_counts().sort_index().to_string()}
+
+{'=' * 70}
+PERFORMANCE METRICS (ON TEST DATA)
+{'=' * 70}
+
+OVERALL ACCURACY: {accuracy:.4f} ({accuracy * 100:.2f}%)
+
+WEIGHTED METRICS (Accounts for Class Imbalance):
+  - Precision: {precision_weighted:.4f}
+  - Recall:    {recall_weighted:.4f}
+  - F1-Score:  {f1_weighted:.4f}
+
+MACRO METRICS (Equal Weight Per Class):
+  - Precision: {precision_macro:.4f}
+  - Recall:    {recall_macro:.4f}
+  - F1-Score:  {f1_macro:.4f}
+
+{'=' * 70}
+PER-CLASS PERFORMANCE (ON TEST DATA)
+{'=' * 70}
+
+{classification_report(y_test_labels, y_pred, labels=present_labels,
+                       target_names=present_class_names, digits=4)}
+
+{'=' * 70}
+CONFUSION MATRIX (ON TEST DATA)
+{'=' * 70}
+
+{cm}
+
+{'=' * 70}
+TOP 10 MOST IMPORTANT FEATURES (FROM SHAP)
+{'=' * 70}
+
+{shap_importance.head(10)[['Feature', 'SHAP_Importance']].to_string(index=False)}
+
+{'=' * 70}
+INTERPRETABILITY METHODS
+{'=' * 70}
+
+✅ LIME (Local Interpretable Model-agnostic Explanations)
+   - Generated explanations for {num_samples} test instances
+   - Files: cnn_lime_explanation_*.html
+
+✅ SHAP (SHapley Additive exPlanations) using DeepExplainer
+   - Computed SHAP values for {sample_size} test instances
+   - Generated summary and waterfall plots
+   - Files: cnn_shap_*.png
+
+{'=' * 70}
+SAVED ARTIFACTS
+{'=' * 70}
+
+📁 {RESULTS_DIR}/
+   ├── cnn_performance_metrics.csv
+   ├── cnn_classification_report.csv
+   ├── cnn_confusion_matrix.png
+   ├── cnn_confusion_matrix_normalized.png
+   ├── cnn_roc_curve.png
+   ├── cnn_lime_explanation_*.html ({num_samples} files)
+   ├── cnn_shap_summary.png
+   ├── cnn_shap_waterfall_*.png (3 files)
+   ├── cnn_shap_feature_importance.csv
+   └── cnn_evaluation_report.txt (this file)
+
+{'=' * 70}
+END OF REPORT
+{'=' * 70}
+"""
+
+with open(os.path.join(RESULTS_DIR, 'cnn_evaluation_report.txt'), 'w', encoding='utf-8') as f:
+    f.write(report_content)
+
+print(f"💾 Evaluation report saved: {RESULTS_DIR}/cnn_evaluation_report.txt")
+
+# =========================================================
+# 📊 FINAL SUMMARY
+# =========================================================
+print("\n" + "=" * 70)
+print("✅ COMPREHENSIVE CNN EVALUATION COMPLETE")
+print("=" * 70)
+
+print(f"""
+🎯 Test Set Performance:
+    • Accuracy:          {accuracy:.4f} ({accuracy * 100:.2f}%)
+    • Precision:         {precision_weighted:.4f}
+    • Recall:            {recall_weighted:.4f}
+    • F1-Score:          {f1_weighted:.4f}
+
+📊 Evaluation Metrics:
+    • Confusion Matrix:      ✅
+    • Classification Report: ✅
+    • ROC Curve:             ✅
+    • Feature Importance:    ✅ (SHAP-based)
+
+🔍 Interpretability:
+    • LIME Explanations:     ✅ ({num_samples} instances)
+    • SHAP Analysis:         ✅ (Global + Local)
+    • Waterfall Plots:       ✅ (3 instances)
+
+📁 All Results Saved To: {RESULTS_DIR}/
+    Total Files Generated: {len(os.listdir(RESULTS_DIR))}
+
+💡 Next Steps:
+    1. Review cnn_evaluation_report.txt for detailed analysis
+    2. Open cnn_lime_explanation_*.html in browser for interactive explanations
+    3. Examine cnn_shap_*.png plots for feature importance insights
+    4. Analyze cnn_confusion_matrix.png for error patterns
+""")
+
+print("=" * 70)
+print("🎉 EVALUATION PIPELINE COMPLETED SUCCESSFULLY!")
+print("=" * 70)
